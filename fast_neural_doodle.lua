@@ -13,9 +13,8 @@ cmd:option('-masks_hdf5', 'masks.hdf5', 'Path to .hdf5 file with masks. It can b
 
 -- Optimization options
 cmd:option('-tv_weight', 0, 'TV weight, zero works fine for me.')
-cmd:option('-num_iterations', 2000)
+cmd:option('-num_iterations', 1200)
 cmd:option('-normalize_gradients', false)
-cmd:option('-init', 'random', 'random|image')
 cmd:option('-optimizer', 'lbfgs', 'lbfgs|adam')
 cmd:option('-learning_rate', 1e1)
 
@@ -26,7 +25,7 @@ cmd:option('-output_image', 'out.png')
 
 -- Other options
 cmd:option('-style_scale', 1.0)
-cmd:option('-pooling', 'max', 'max|avg')
+cmd:option('-pooling', 'avg', 'max|avg')
 cmd:option('-proto_file', 'data/pretrained/VGG_ILSVRC_19_layers_deploy.prototxt')
 cmd:option('-model_file', 'data/pretrained/VGG_ILSVRC_19_layers.caffemodel')
 cmd:option('-backend', 'nn', 'nn|cudnn|clnn')
@@ -245,11 +244,9 @@ local function main()
     torch.manualSeed(params.seed)
   end
   local img = nil
-  if params.init == 'random' then
-    img = torch.randn(3, target_size[1], target_size[2]):float():mul(0.001)
-  else  
-    error('Invalid init type')
-  end
+  
+  img = torch.randn(3, target_size[1], target_size[2]):float():mul(0.001)
+  
   if params.gpu >= 0 then
     if params.backend ~= 'clnn' then
       img = img:cuda()
@@ -384,7 +381,7 @@ function StyleLoss:updateGradInput(input, gradOutput)
       if self.target_masks[k]:mean() > 0 then
         dG:div(input:nElement()*self.target_masks[k]:mean())
       end
-      
+
       local gradInput = self.grams[k]:backward(self.masked_inputs[k], dG)
       if self.normalize then
         gradInput:div(torch.norm(gradInput, 1) + 1e-8)
