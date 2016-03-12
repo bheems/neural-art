@@ -125,9 +125,35 @@ local function main()
      
       if is_pooling then
        
-        for k, _ in ipairs(style_masks) do
-          style_masks[k] = image.scale(style_masks[k]  , math.ceil(style_masks[k]:size(2)/2), math.ceil(style_masks[k]:size(1)/2))
-          target_masks[k] = image.scale(target_masks[k] , math.ceil(target_masks[k]:size(2)/2), math.ceil(target_masks[k]:size(1)/2))
+        if params.pooling == 'avg' then
+          assert(layer.padW == 0 and layer.padH == 0)
+          local kW, kH = layer.kW, layer.kH
+          local dW, dH = layer.dW, layer.dH
+          local avg_pool_layer = nn.SpatialAveragePooling(kW, kH, dW, dH):float()
+          if params.gpu >= 0 then
+            if params.backend ~= 'clnn' then
+              avg_pool_layer:cuda()
+            else
+              avg_pool_layer:cl()
+            end
+          end
+          local msg = 'Replacing max pooling at layer %d with average pooling'
+          print(string.format(msg, i))
+          
+          layer = avg_pool_layer
+
+          -- For some reasons avg pooling does `floor` operation
+          for k, _ in ipairs(style_masks) do
+            style_masks[k] = image.scale(style_masks[k]  , math.floor(style_masks[k]:size(2)/2), math.floor(style_masks[k]:size(1)/2))
+            target_masks[k] = image.scale(target_masks[k] , math.floor(target_masks[k]:size(2)/2), math.floor(target_masks[k]:size(1)/2))
+          end
+        
+        else
+          -- max pooling
+          for k, _ in ipairs(style_masks) do
+            style_masks[k] = image.scale(style_masks[k]  , math.ceil(style_masks[k]:size(2)/2), math.ceil(style_masks[k]:size(1)/2))
+            target_masks[k] = image.scale(target_masks[k] , math.ceil(target_masks[k]:size(2)/2), math.ceil(target_masks[k]:size(1)/2))
+          end
         end
         style_masks = deepcopy(style_masks)
         target_masks = deepcopy(target_masks)
@@ -179,7 +205,10 @@ local function main()
        
           local target = gram:forward(masked):clone()
 
-          target:div(target_features:nElement() * style_masks[k]:mean())
+          if style_masks[k]:mean() > 0 then
+            target:div(target_features:nElement() * style_masks[k]:mean())
+          end
+
           target_grams[k] = target
         end
 
@@ -332,7 +361,10 @@ function StyleLoss:updateOutput(input)
 
       self.G[k] = self.grams[k]:forward(self.masked_inputs[k])
 
-      self.G[k]:div(input:nElement()*self.target_masks[k]:mean())
+      if(self.target_masks[k]:mean() > 0) then
+        self.G[k]:div(input:nElement()*self.target_masks[k]:mean())
+      end
+
       self.loss = self.loss + self.crits[k]:forward(self.G[k], self.targets[k])  
     end
   end 
@@ -348,8 +380,11 @@ function StyleLoss:updateGradInput(input, gradOutput)
 
     for k , _ in ipairs(self.target_masks) do 
       local dG = self.crits[k]:backward(self.G[k], self.targets[k])
-      dG:div(input:nElement()*self.target_masks[k]:mean())
-
+      
+      if self.target_masks[k]:mean() > 0 then
+        dG:div(input:nElement()*self.target_masks[k]:mean())
+      end
+      
       local gradInput = self.grams[k]:backward(self.masked_inputs[k], dG)
       if self.normalize then
         gradInput:div(torch.norm(gradInput, 1) + 1e-8)
