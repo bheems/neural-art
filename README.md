@@ -10,7 +10,7 @@ It takes several minutes to redraw `Renoir` example using GPU and it will easily
 - [torch-hdf5](https://github.com/deepmind/torch-hdf5)
 - python + numpy + scipy + h5py + sklearn
 
-Tested with python2 and latest `conda` packages.
+Tested with python2.7 and latest `conda` packages.
 ## Do it yourself
 
 First download VGG-19.
@@ -25,7 +25,7 @@ python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style
 
 Now run doodle.
 ```
-th fast_neural_doodle.lua -masks_hdf5 masks.hdf5 -vgg_no_pad -backend cudnn
+th fast_neural_doodle.lua -masks_hdf5 masks.hdf5 -vgg_no_pad
 ```
 
 And here is the result.
@@ -36,7 +36,7 @@ And the result for Monet.
 ![Renoir](data/Monet/grid.png)
 
 ## Misc
--Supported backends: 
+- Supported backends: 
 	- nn (CPU/GPU mode)
 	- cudnn
 	- clnn (not tested yet..)
