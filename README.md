@@ -21,10 +21,13 @@ python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style
 th neural_style.lua - -vgg_no_pad
 ```
 And here is the result.
-![original](data/Renoir/style.png)
-![style_mask](data/Renoir/style_mask.png)
-![target_mask](data/Renoir/target_mask.png)
-![result](data/Renoir/result.png)
+![Renoir](data/Renoir/grid.png)
+First row: original, second -- result.
 
+And the result for Monet.
+![Renoir](data/Monet/grid.png)
+
+
+## Acknowledgement
 
 The code is heavily based on [Justin Johnsons great code](https://github.com/jcjohnson/neural-style) for artistic style.
