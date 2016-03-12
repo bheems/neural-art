@@ -4,7 +4,13 @@ This is my try on drawing with neural networks, which is much faster than [Alex 
 
 It takes several minutes to redraw `Renoir` example using GPU and it will easily fit in 4GB GPUs. If you were able to work with [Justin Johnsons code for artistic style](https://github.com/jcjohnson/neural-style) then this code should work for you too. 
 
-*For now the code tested only for GPU cuda mode. *
+## Requirements
+- torch
+- torch.cudnn (optional)
+- [torch-hdf5](https://github.com/deepmind/torch-hdf5)
+- python + numpy + scipy + h5py + sklearn
+
+Tested with python2 and latest `conda` packages.
 ## Do it yourself
 
 First download VGG-19.
@@ -17,6 +23,7 @@ Use this script to get intermediate representations for masks.
 python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style_mask=data/Renoir/style_mask.png --target_mask=data/Renoir/target_mask.png
 ```
 
+Now run doodle.
 ```
 th fast_neural_doodle.lua -masks_hdf5 masks.hdf5 -vgg_no_pad -backend cudnn
 ```
@@ -28,6 +35,13 @@ First row: original, second -- result.
 And the result for Monet.
 ![Renoir](data/Monet/grid.png)
 
+## Misc
+-Supported backends: 
+	- nn (CPU/GPU mode)
+	- cudnn
+	- clnn (not tested yet..)
+ 
+- When using `-backend cudnn` do not forget to switch `-cudnn_autotune`.
 
 ## Acknowledgement
 

@@ -1,10 +1,8 @@
 require 'torch'
-require 'cutorch'
 require 'nn'
 require 'image'
 require 'optim'
 require 'hdf5'
-require 'src/utils'
 require 'loadcaffe'
 
 local cmd = torch.CmdLine()
@@ -32,7 +30,7 @@ cmd:option('-pooling', 'max', 'max|avg')
 cmd:option('-proto_file', 'data/pretrained/VGG_ILSVRC_19_layers_deploy.prototxt')
 cmd:option('-model_file', 'data/pretrained/VGG_ILSVRC_19_layers.caffemodel')
 cmd:option('-backend', 'nn', 'nn|cudnn|clnn')
-cmd:option('-cudnn_autotune', true)
+cmd:option('-cudnn_autotune', false)
 cmd:option('-seed', -1)
 
 cmd:option('-vgg_no_pad', false, 'Because of border effects padding is advised to be set to `valid`. This flag does it.')
@@ -53,7 +51,8 @@ local function main()
   else
     params.backend = 'nn'
   end
-
+  require 'src/utils'
+  
   if params.backend == 'cudnn' then
     require 'cudnn'
     if params.cudnn_autotune then
@@ -76,15 +75,23 @@ local function main()
   -- Load style
   local f_data = hdf5.open(params.masks_hdf5)
   local style_img = f_data:read('style_img'):all()
-  style_img = preprocess(style_img):cuda()
+  style_img = preprocess(style_img):float()
+
+  if params.gpu >= 0 then
+    if params.backend ~= 'clnn' then
+      style_img = style_img:cuda()
+    else
+      style_img = style_img:cl()
+    end
+  end
 
   local n_colors = f_data:read('n_colors'):all()[1]
 
   -- Load masks
   local style_masks, target_masks = {}, {}
   for k = 0, n_colors - 1 do
-    table.insert(style_masks, f_data:read('style_mask_' .. k):all())
-    table.insert(target_masks, f_data:read('target_mask_' .. k):all())
+    table.insert(style_masks, f_data:read('style_mask_' .. k):all():float())
+    table.insert(target_masks, f_data:read('target_mask_' .. k):all():float())
   end
 
   local target_size = target_masks[1]:size()
@@ -160,7 +167,14 @@ local function main()
         -- Compute target gram mats
         local target_grams = {}
         for k, _ in ipairs(style_masks) do
-          local layer_mask = style_masks[k]:add_dummy():expandAs(target_features):cuda()
+          local layer_mask = style_masks[k]:add_dummy():expandAs(target_features)
+          if params.gpu >= 0 then
+            if params.backend ~= 'clnn' then
+              layer_mask = layer_mask:cuda()
+            else
+              layer_mask = layer_mask:cl()
+            end
+          end
           local masked = torch.cmul(target_features, layer_mask)
        
           local target = gram:forward(masked):clone()

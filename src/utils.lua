@@ -14,9 +14,18 @@ function torch.DoubleTensor:add_dummy()
   return torch.add_dummy(self)
 end
 
-function torch.CudaTensor:add_dummy()
-  return torch.add_dummy(self)
+if params.gpu >= 0 then
+  if params.backend ~= 'clnn' then
+    function torch.CudaTensor:add_dummy()
+      return torch.add_dummy(self)
+    end
+  else
+    function torch.ClTensor:add_dummy()
+      return torch.add_dummy(self)
+    end
+  end
 end
+
 
 function deepcopy(orig)
     local orig_type = type(orig)
