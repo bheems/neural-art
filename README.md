@@ -18,8 +18,9 @@ python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style
 ```
 
 ```
-th neural_style.lua - -vgg_no_pad
+th fast_neural_doodle.lua -masks_hdf5 masks.hdf5 -vgg_no_pad -backend cudnn
 ```
+
 And here is the result.
 ![Renoir](data/Renoir/grid.png)
 First row: original, second -- result.
