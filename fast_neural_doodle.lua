@@ -4,23 +4,28 @@ require 'image'
 require 'optim'
 require 'hdf5'
 require 'loadcaffe'
+require 'src/style_loss'
 
 local cmd = torch.CmdLine()
 
 -- Basic options
 cmd:option('-gpu', 0, 'Zero-indexed ID of the GPU to use; for CPU mode set -gpu = -1')
-cmd:option('-masks_hdf5', 'masks.hdf5', 'Path to .hdf5 file with masks. It can be obtained with get_mask_hdf5.py.')
+cmd:option('-masks_hdf5', 'masks.hdf5', 
+           'Path to .hdf5 file with masks. It can be obtained with get_mask_hdf5.py.')
 
 -- Optimization options
 cmd:option('-tv_weight', 0, 'TV weight, zero works fine for me.')
-cmd:option('-num_iterations', 1000)
 cmd:option('-normalize_gradients', false)
 cmd:option('-optimizer', 'lbfgs', 'lbfgs|adam')
 cmd:option('-learning_rate', 1e1)
 
+cmd:option('-num_iterations', '1000',
+           'Comma separated (no spaces) list with iteration number to do at corresponding resolution.')
+cmd:option('-resolutions', '0', 'Comma separated (no spaces) list or resolutions. 0 for original')
+
 -- Output options
 cmd:option('-print_iter', 50)
-cmd:option('-save_iter', 100)
+cmd:option('-save_iter', 50)
 cmd:option('-output_image', 'out.png')
 
 -- Other options
@@ -37,43 +42,13 @@ cmd:option('-style_layers', 'relu1_1,relu2_1,relu3_1,relu4_1,relu5_1', 'layers f
 
 local function main()
   init = true
-  if params.gpu >= 0 then
-    if params.backend ~= 'clnn' then
-      require 'cutorch'
-      require 'cunn'
-      cutorch.setDevice(params.gpu + 1)
-    else
-      require 'clnn'
-      require 'cltorch'
-      cltorch.setDevice(params.gpu + 1)
-    end
-  else
-    params.backend = 'nn'
-  end
-  require 'src/utils'
-  
-  if params.backend == 'cudnn' then
-    require 'cudnn'
-    if params.cudnn_autotune then
-      cudnn.benchmark = true
-    end
-    cudnn.SpatialConvolution.accGradParameters = nn.SpatialConvolutionMM.accGradParameters -- ie: nop
-  end
-  
-  local loadcaffe_backend = params.backend
-  if params.backend == 'clnn' then loadcaffe_backend = 'nn' end
-  local cnn = loadcaffe.load(params.proto_file, params.model_file, loadcaffe_backend):float()
-  if params.gpu >= 0 then
-    if params.backend ~= 'clnn' then
-      cnn:cuda()
-    else
-      cnn:cl()
-    end
-  end
-  
+   
   -- Load style
   local f_data = hdf5.open(params.masks_hdf5)
   local style_img = f_data:read('style_img'):all()
+  if cur_resolution ~= 0 then 
+    style_img =  image.scale(style_img,  cur_resolution, cur_resolution)
+  end
   style_img = preprocess(style_img):float()
 
   if params.gpu >= 0 then
@@ -89,10 +64,17 @@ local function main()
   -- Load masks
   local style_masks, target_masks = {}, {}
   for k = 0, n_colors - 1 do
-    table.insert(style_masks, f_data:read('style_mask_' .. k):all():float())
-    table.insert(target_masks, f_data:read('target_mask_' .. k):all():float())
+    local style_mask = f_data:read('style_mask_' .. k):all():float()
+    local target_mask = f_data:read('target_mask_' .. k):all():float()
+    
+    -- Scale
+    if cur_resolution ~= 0 then 
+      style_mask =  image.scale(style_mask,  cur_resolution, cur_resolution, 'simple')
+      target_mask = image.scale(target_mask, cur_resolution, cur_resolution, 'simple')
+    end
+    table.insert(style_masks, style_mask)
+    table.insert(target_masks, target_mask)
   end
-
   local target_size = target_masks[1]:size()
  
   local style_layers = params.style_layers:split(",")
@@ -140,20 +122,14 @@ local function main()
           print(string.format(msg, i))
           
           layer = avg_pool_layer
-
-          -- For some reasons avg pooling does `floor` operation
-          for k, _ in ipairs(style_masks) do
-            style_masks[k] = image.scale(style_masks[k]  , math.floor(style_masks[k]:size(2)/2), math.floor(style_masks[k]:size(1)/2))
-            target_masks[k] = image.scale(target_masks[k] , math.floor(target_masks[k]:size(2)/2), math.floor(target_masks[k]:size(1)/2))
-          end
-        
-        else
-          -- max pooling
-          for k, _ in ipairs(style_masks) do
-            style_masks[k] = image.scale(style_masks[k]  , math.ceil(style_masks[k]:size(2)/2), math.ceil(style_masks[k]:size(1)/2))
-            target_masks[k] = image.scale(target_masks[k] , math.ceil(target_masks[k]:size(2)/2), math.ceil(target_masks[k]:size(1)/2))
-          end
         end
+
+        layer:floor()
+        for k, _ in ipairs(style_masks) do
+          style_masks[k] = image.scale(style_masks[k]  , math.floor(style_masks[k]:size(2)/2), math.floor(style_masks[k]:size(1)/2))
+          target_masks[k] = image.scale(target_masks[k] , math.floor(target_masks[k]:size(2)/2), math.floor(target_masks[k]:size(1)/2))
+        end
+
         style_masks = deepcopy(style_masks)
         target_masks = deepcopy(target_masks)
 
@@ -229,7 +205,7 @@ local function main()
   end
   init = false
   -- We don't need the base CNN anymore, so clean it up to save memory.
-  cnn = nil
+  
   for i=1,#net.modules do
     local module = net.modules[i]
     if torch.type(module) == 'nn.SpatialConvolutionMM' then
@@ -239,14 +215,16 @@ local function main()
   end
   collectgarbage()
   
-  -- Initialize the image
-  if params.seed >= 0 then
-    torch.manualSeed(params.seed)
+  -- Initialize with previous or with noise
+  if img then 
+    img = image.scale(img:float(), target_size[2], target_size[1])
+  else
+    if params.seed >= 0 then
+      torch.manualSeed(params.seed)
+    end
+    img = torch.randn(3, target_size[1], target_size[2]):float():mul(0.001)
   end
-  local img = nil
-  
-  img = torch.randn(3, target_size[1], target_size[2]):float():mul(0.001)
-  
+
   if params.gpu >= 0 then
     if params.backend ~= 'clnn' then
       img = img:cuda()
@@ -265,7 +243,7 @@ local function main()
   local optim_state = nil
   if params.optimizer == 'lbfgs' then
     optim_state = {
-      maxIter = params.num_iterations,
+      maxIter = cur_num_iterations,
             tolX = -1,
       tolFun = -1,
       verbose=true,
@@ -306,127 +284,67 @@ local function main()
     local x, losses = optim.lbfgs(feval, img, optim_state)
   elseif params.optimizer == 'adam' then
     print('Running optimization with ADAM')
-    for t = 1, params.num_iterations do
+    for t = 1, cur_num_iterations do
       local x, losses = optim.adam(feval, img, optim_state)
     end
   end
 end
   
--- Returns a network that computes the CxC Gram matrix from inputs
--- of size C x H x W
-function GramMatrix()
-  local net = nn.Sequential()
-  net:add(nn.View(-1):setNumInputDims(2))
-  local concat = nn.ConcatTable()
-  concat:add(nn.Identity())
-  concat:add(nn.Identity())
-  net:add(concat)
-  net:add(nn.MM(false, true))
-  return net
-end
-
--- Define an nn Module to compute style loss in-place
-local StyleLoss, parent = torch.class('nn.StyleLoss', 'nn.Module')
-
-function StyleLoss:__init(strength, target_grams, normalize, target_masks)
-  parent.__init(self)
-  self.normalize = normalize or false
-  self.strength = strength
-  self.targets = target_grams
-  self.loss = 0
-  
-  self.target_masks = target_masks
-  
-  self.grams = {} 
-  self.crits = {} 
-  self.G = {}
-  self.masked_inputs = {}
-
-  for k = 1 , #self.target_masks do
-    self.grams[k] = GramMatrix()
-    self.crits[k] = nn.SmoothL1Criterion()
-  end
-
-end
-
-function StyleLoss:updateOutput(input)
-  -- Iterate through colors and update grams
-  if not init then
-    self.loss = 0
-    for k , _ in ipairs(self.target_masks) do 
-      self.masked_inputs[k] = torch.cmul(input,self.target_masks[k]:add_dummy():expandAs(input))
-
-      self.G[k] = self.grams[k]:forward(self.masked_inputs[k])
-
-      if(self.target_masks[k]:mean() > 0) then
-        self.G[k]:div(input:nElement()*self.target_masks[k]:mean())
-      end
-
-      self.loss = self.loss + self.crits[k]:forward(self.G[k], self.targets[k])  
-    end
-  end 
-
-  self.output = input
-  return self.output
-end
-
-function StyleLoss:updateGradInput(input, gradOutput)
-  -- Iterate through colors and get gradient
-  if not init then
-    self.gradInput = gradOutput:clone():zero()
-
-    for k , _ in ipairs(self.target_masks) do 
-      local dG = self.crits[k]:backward(self.G[k], self.targets[k])
-      
-      if self.target_masks[k]:mean() > 0 then
-        dG:div(input:nElement()*self.target_masks[k]:mean())
-      end
-
-      local gradInput = self.grams[k]:backward(self.masked_inputs[k], dG)
-      if self.normalize then
-        gradInput:div(torch.norm(gradInput, 1) + 1e-8)
-      end
-      self.gradInput:add(gradInput)
-
-    end
-    self.gradInput:add(gradOutput)
-  end
-  return self.gradInput
-end
 
 
-local TVLoss, parent = torch.class('nn.TVLoss', 'nn.Module')
-
-function TVLoss:__init(strength)
-  parent.__init(self)
-  self.strength = strength
-  self.x_diff = torch.Tensor()
-  self.y_diff = torch.Tensor()
-end
-
-function TVLoss:updateOutput(input)
-  self.output = input
-  return self.output
-end
-
--- TV loss backward pass inspired by kaishengtai/neuralart
-function TVLoss:updateGradInput(input, gradOutput)
-  self.gradInput:resizeAs(input):zero()
-  local C, H, W = input:size(1), input:size(2), input:size(3)
-  self.x_diff:resize(3, H - 1, W - 1)
-  self.y_diff:resize(3, H - 1, W - 1)
-  self.x_diff:copy(input[{{}, {1, -2}, {1, -2}}])
-  self.x_diff:add(-1, input[{{}, {1, -2}, {2, -1}}])
-  self.y_diff:copy(input[{{}, {1, -2}, {1, -2}}])
-  self.y_diff:add(-1, input[{{}, {2, -1}, {1, -2}}])
-  self.gradInput[{{}, {1, -2}, {1, -2}}]:add(self.x_diff):add(self.y_diff)
-  self.gradInput[{{}, {1, -2}, {2, -1}}]:add(-1, self.x_diff)
-  self.gradInput[{{}, {2, -1}, {1, -2}}]:add(-1, self.y_diff)
-  self.gradInput:mul(self.strength)
-  self.gradInput:add(gradOutput)
-  return self.gradInput
-end
-
+-------------------------------------------------------------
 
 params = cmd:parse(arg)
-main(params)
+
+-- Load libs
+if params.gpu >= 0 then
+  if params.backend ~= 'clnn' then
+    require 'cutorch'
+    require 'cunn'
+    cutorch.setDevice(params.gpu + 1)
+  else
+    require 'clnn'
+    require 'cltorch'
+    cltorch.setDevice(params.gpu + 1)
+  end
+else
+  params.backend = 'nn'
+end
+require 'src/utils'
+
+if params.backend == 'cudnn' then
+  require 'cudnn'
+  if params.cudnn_autotune then
+    cudnn.benchmark = true
+  end
+end
+
+-- Load VGG
+local loadcaffe_backend = params.backend
+if params.backend == 'clnn' then loadcaffe_backend = 'nn' end
+cnn = loadcaffe.load(params.proto_file, params.model_file, loadcaffe_backend):float()
+if params.gpu >= 0 then
+  if params.backend ~= 'clnn' then
+    cnn:cuda()
+  else
+    cnn:cl()
+  end
+end
+
+for i = 1,9 do
+  cnn:remove()
+end
+
+
+-- run at different resolutions
+local resolutions = params.resolutions:split(",")
+local num_iterations = params.num_iterations:split(",")
+assert(#resolutions == #num_iterations, 'Incorrect resolution-iteration correspondence.')
+
+img = nil
+for res = 1, #resolutions do
+  cur_resolution = tonumber(resolutions[res])
+  cur_num_iterations = tonumber(num_iterations[res])
+
+  main(params)
+end

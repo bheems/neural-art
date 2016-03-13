@@ -35,6 +35,14 @@ First row: original, second -- result.
 And Monet.
 ![Renoir](data/Monet/grid.png)
 
+## Multiscale
+
+Processing the image at low resolution first can provide a significant speed-up. You can pass a list of resolutions to use when processing. Passing `256` means that the images and masks should be resized to `256x256` resolution. With `0` passed no resizing is done. Here is an example for cmd parameters: 
+- `-num_iterations 450,100 -resolutions 256,0`
+Which means: work for 450 iterations at `256x256` resolution and 100 iterations at original. 
+
+`Monet` and `Renoir` examples take ~1.5 min to process with these options. 
+
 ## Misc
 - Supported backends: 
 	- nn (CPU/GPU mode)
