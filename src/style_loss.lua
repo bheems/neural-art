@@ -18,64 +18,75 @@ function StyleLoss:__init(strength, target_grams, normalize, target_masks)
   parent.__init(self)
   self.normalize = normalize or false
   self.strength = strength
-  self.targets = target_grams
+  self.target_grams = target_grams
   self.loss = 0
   
   self.target_masks = target_masks
-  
-  self.grams = {} 
-  self.crits = {} 
-  self.G = {}
-  self.masked_inputs = {}
+  self.target_masks_means = nil
+  self.target_masks_exp = nil
 
-  for k = 1 , #self.target_masks do
-    self.grams[k] = GramMatrix()
-    self.crits[k] = nn.SmoothL1Criterion()
-  end
+  self.first = true
 
+  self.gram = GramMatrix()
+  self.crit = nn.SmoothL1Criterion()
+
+  self.gradInput = nil
 end
 
 function StyleLoss:updateOutput(input)
-  -- Iterate through colors and update grams
-  if not init then
-    self.loss = 0
-    for k , _ in ipairs(self.target_masks) do 
-      self.masked_inputs[k] = torch.cmul(input,self.target_masks[k]:add_dummy():expandAs(input))
-
-      self.G[k] = self.grams[k]:forward(self.masked_inputs[k])
-
-      if(self.target_masks[k]:mean() > 0) then
-        self.G[k]:div(input:nElement()*self.target_masks[k]:mean())
-      end
-
-      self.loss = self.loss + self.crits[k]:forward(self.G[k], self.targets[k])  
-    end
-  end 
-
+  -- We do everything in updateGradInput to save memory
   self.output = input
   return self.output
 end
 
 function StyleLoss:updateGradInput(input, gradOutput)
   -- Iterate through colors and get gradient
-  if not init then
-    self.gradInput = gradOutput:clone():zero()
+  self.gradInput = self.gradInput or gradOutput:clone()
+  self.gradInput:zero()
+  self.loss = 0 
+  
+  -- Expand masks for one time
+  if self.first then
+    self.first = false
+    self.target_masks_exp = {}
+    self.target_masks_means = {}
 
-    for k , _ in ipairs(self.target_masks) do 
-      local dG = self.crits[k]:backward(self.G[k], self.targets[k])
-      
-      if self.target_masks[k]:mean() > 0 then
-        dG:div(input:nElement()*self.target_masks[k]:mean())
-      end
-
-      local gradInput = self.grams[k]:backward(self.masked_inputs[k], dG)
-      if self.normalize then
-        gradInput:div(torch.norm(gradInput, 1) + 1e-8)
-      end
-      self.gradInput:add(gradInput)
-
+    for k , _ in ipairs(self.target_masks) do
+       self.target_masks_exp[k] = self.target_masks[k]:add_dummy():expandAs(input)
+       self.target_masks_means[k] = self.target_masks[k]:mean()
+       
+       -- Delete
+       self.target_masks[k] = nil
     end
-    self.gradInput:add(gradOutput)
   end
+
+  -- Apply masks
+  for k , _ in ipairs(self.target_masks_exp) do
+
+    -- Forward
+    local masked_input = torch.cmul(input,self.target_masks_exp[k])
+    local G = self.gram:forward(masked_input)
+
+    if(self.target_masks_means[k] > 0) then
+      G:div(input:nElement() * self.target_masks_means[k])
+    end
+
+    self.loss = self.loss + self.crit:forward(G, self.target_grams[k])  
+
+    -- Backward
+    local dG = self.crit:backward(G, self.target_grams[k])
+    if self.target_masks_means[k] > 0 then
+      dG:div(input:nElement() * self.target_masks_means[k])
+    end
+
+    local gradInput = self.gram:backward(masked_input, dG)
+    if self.normalize then
+      gradInput:div(torch.norm(gradInput, 1) + 1e-8)
+    end
+    self.gradInput:add(gradInput)
+
+  end
+  self.gradInput:add(gradOutput)
+ 
   return self.gradInput
 end
