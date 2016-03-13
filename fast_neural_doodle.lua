@@ -13,7 +13,7 @@ cmd:option('-masks_hdf5', 'masks.hdf5', 'Path to .hdf5 file with masks. It can b
 
 -- Optimization options
 cmd:option('-tv_weight', 0, 'TV weight, zero works fine for me.')
-cmd:option('-num_iterations', 1200)
+cmd:option('-num_iterations', 1000)
 cmd:option('-normalize_gradients', false)
 cmd:option('-optimizer', 'lbfgs', 'lbfgs|adam')
 cmd:option('-learning_rate', 1e1)
