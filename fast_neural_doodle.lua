@@ -15,7 +15,7 @@ cmd:option('-masks_hdf5', 'masks.hdf5',
            'Path to .hdf5 file with masks. It can be obtained with get_mask_hdf5.py.')
 
 -- Optimization options
-cmd:option('-content_weight', 1e-4)
+cmd:option('-content_weight', 1e-3)
 cmd:option('-style_weight', 1e0)
 cmd:option('-tv_weight', 0, 'TV weight, zero works fine for me.')
 cmd:option('-normalize_gradients', false)
@@ -49,23 +49,24 @@ local function main()
    
   -- Load images
   local f_data = hdf5.open(params.masks_hdf5)
-  local style_img = f_data:read('style_img'):all()
+  local style_img = f_data:read('style_img'):all():float()
   if cur_resolution ~= 0 then 
     style_img =  image.scale(style_img,  cur_resolution, cur_resolution)
     content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
   end
   style_img = preprocess(style_img):float()
 
-  local has_content = f_data:read('has_content')[0]
+  local has_content = f_data:read('has_content'):all()[1]
+  local content_img
   if has_content then
-    local content_img = f_data:read('content_img'):all()
+    content_img = f_data:read('content_img'):all():float()
     content_img = preprocess(content_img):float()
     if cur_resolution ~= 0 then
         content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
     end
     content_img = preprocess(content_img):float()
   else
-    print('Content image is not provided, content weight will be set to zero')
+    print('Content image is not provided, content loss will be ignored')
     params.content_weight = 0
   end
 
