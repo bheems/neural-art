@@ -5,6 +5,7 @@ require 'optim'
 require 'hdf5'
 require 'loadcaffe'
 require 'src/style_loss'
+require 'src/content_loss'
 
 local cmd = torch.CmdLine()
 
@@ -14,6 +15,8 @@ cmd:option('-masks_hdf5', 'masks.hdf5',
            'Path to .hdf5 file with masks. It can be obtained with get_mask_hdf5.py.')
 
 -- Optimization options
+cmd:option('-content_weight', 1e-4)
+cmd:option('-style_weight', 1e0)
 cmd:option('-tv_weight', 0, 'TV weight, zero works fine for me.')
 cmd:option('-normalize_gradients', false)
 cmd:option('-optimizer', 'lbfgs', 'lbfgs|adam')
@@ -38,24 +41,30 @@ cmd:option('-cudnn_autotune', false)
 cmd:option('-seed', -1)
 
 cmd:option('-vgg_no_pad', false, 'Because of border effects padding is advised to be set to `valid`. This flag does it.')
+cmd:option('-content_layers', 'relu4_2', 'layers for content')
 cmd:option('-style_layers', 'relu1_1,relu2_1,relu3_1,relu4_1,relu5_1', 'layers for style')
 
 local function main()
   init = true
    
-  -- Load style
+  -- Load images
   local f_data = hdf5.open(params.masks_hdf5)
   local style_img = f_data:read('style_img'):all()
+  local content_img = f_data:read('content_img'):all()
   if cur_resolution ~= 0 then 
     style_img =  image.scale(style_img,  cur_resolution, cur_resolution)
+    content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
   end
   style_img = preprocess(style_img):float()
+  content_img = preprocess(content_img):float()
 
   if params.gpu >= 0 then
     if params.backend ~= 'clnn' then
       style_img = style_img:cuda()
+      content_img = content_img:cuda()
     else
       style_img = style_img:cl()
+      content_img = content_img:cl()
     end
   end
 
@@ -77,11 +86,12 @@ local function main()
   end
   local target_size = target_masks[1]:size()
  
+  local content_layers = params.content_layers:split(",")
   local style_layers = params.style_layers:split(",")
 
   -- Set up the network, inserting style and content loss modules
-  local style_losses = {}
-  local next_style_idx = 1
+  local content_losses, style_losses = {}, {}
+  local next_content_idx, next_style_idx = 1, 1
   local net = nn.Sequential()
 
   if params.tv_weight > 0 then
@@ -96,7 +106,7 @@ local function main()
     net:add(tv_mod)
   end
   for i = 1, #cnn do
-
+    
     if next_style_idx <= #style_layers then
       local layer = cnn:get(i)
       local name = layer.name
@@ -151,6 +161,23 @@ local function main()
 
       net:add(layer)
       
+      -- Content
+      if name == content_layers[next_content_idx] then
+        print("Setting up content layer", i, ":", layer.name)
+        local target = net:forward(content_img):clone()
+        local norm = params.normalize_gradients
+        local loss_module = nn.ContentLoss(params.content_weight, target, norm):float()
+        if params.gpu >= 0 then
+          if params.backend ~= 'clnn' then
+            loss_module:cuda()
+          else
+            loss_module:cl()
+          end
+        end
+        net:add(loss_module)
+        table.insert(content_losses, loss_module)
+        next_content_idx = next_content_idx + 1
+      end
       -- Style   
       if name == style_layers[next_style_idx] then
         print("Setting up style layer  ", i, ":", layer.name)
@@ -188,6 +215,7 @@ local function main()
         end
 
         local norm = params.normalize_gradients
+        print('style loss')
         local loss_module = nn.StyleLoss(params.style_weight, target_grams, norm,  deepcopy(target_masks)):float()
         if params.gpu >= 0 then
           if params.backend ~= 'clnn' then

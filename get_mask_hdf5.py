@@ -8,14 +8,17 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--n_colors', type=int, help='How many distinct colors does mask have.')
 parser.add_argument('--style_image', help='Path to style image.')
+parser.add_argument('--content_image', help='Path to content image.')
 parser.add_argument('--style_mask', help='Path to mask for style.')
 parser.add_argument('--target_mask', help='Path to target mask.')
 parser.add_argument('--out_hdf5', default='masks.hdf5', help='Where to store hdf5 file.')
 
 args = parser.parse_args()
 
-# Load style
+# Load images
 img_style = scipy.misc.imread(args.style_image)
+if args.content_image != None:
+    img_content = scipy.misc.imread(args.content_image)
 
 # Load masks
 mask_style = scipy.misc.imread(args.style_mask)
@@ -46,8 +49,12 @@ for i in range(args.n_colors):
     f['target_mask_%d' % i] = (target_kval == i).astype(float)
 
 # Torch style image save
-f['style_img'] = img_style.transpose(2, 0, 1).astype(float)/255.
-f['n_colors'] = np.array([args.n_colors]) # Toch do not want to read just number
+f['style_img'] = img_style.transpose(2, 0, 1).astype(float) / 255.
+if args.content_image != None:
+    f['content_img'] = img_content.transpose(2, 0, 1).astype(float) / 255.
+else:
+    f['content_img'] = None
+f['n_colors'] = np.array([args.n_colors]) # Torch does not want to read just number
 
 f.close()
 
