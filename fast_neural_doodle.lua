@@ -50,21 +50,36 @@ local function main()
   -- Load images
   local f_data = hdf5.open(params.masks_hdf5)
   local style_img = f_data:read('style_img'):all()
-  local content_img = f_data:read('content_img'):all()
   if cur_resolution ~= 0 then 
     style_img =  image.scale(style_img,  cur_resolution, cur_resolution)
     content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
   end
   style_img = preprocess(style_img):float()
-  content_img = preprocess(content_img):float()
+
+  local has_content = f_data:read('has_content')[0]
+  if has_content then
+    local content_img = f_data:read('content_img'):all()
+    content_img = preprocess(content_img):float()
+    if cur_resolution ~= 0 then
+        content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
+    end
+    content_img = preprocess(content_img):float()
+  else
+    print('Content image is not provided, content weight will be set to zero')
+    params.content_weight = 0
+  end
 
   if params.gpu >= 0 then
     if params.backend ~= 'clnn' then
       style_img = style_img:cuda()
-      content_img = content_img:cuda()
+      if has_content then
+        content_img = content_img:cuda()
+      end
     else
       style_img = style_img:cl()
-      content_img = content_img:cl()
+      if has_content then
+        content_img = content_img:cl()
+      end
     end
   end
 
@@ -162,7 +177,7 @@ local function main()
       net:add(layer)
       
       -- Content
-      if name == content_layers[next_content_idx] then
+      if has_content and name == content_layers[next_content_idx] then
         print("Setting up content layer", i, ":", layer.name)
         local target = net:forward(content_img):clone()
         local norm = params.normalize_gradients
@@ -215,7 +230,6 @@ local function main()
         end
 
         local norm = params.normalize_gradients
-        print('style loss')
         local loss_module = nn.StyleLoss(params.style_weight, target_grams, norm,  deepcopy(target_masks)):float()
         if params.gpu >= 0 then
           if params.backend ~= 'clnn' then

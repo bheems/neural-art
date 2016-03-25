@@ -52,8 +52,10 @@ for i in range(args.n_colors):
 f['style_img'] = img_style.transpose(2, 0, 1).astype(float) / 255.
 if args.content_image != None:
     f['content_img'] = img_content.transpose(2, 0, 1).astype(float) / 255.
+    f['has_content'] = np.array([True])
 else:
-    f['content_img'] = None
+    #f['content_img'] = np.array([0])
+    f['has_content'] = np.array([False])
 f['n_colors'] = np.array([args.n_colors]) # Torch does not want to read just number
 
 f.close()
