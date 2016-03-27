@@ -51,18 +51,16 @@ local function main()
   local f_data = hdf5.open(params.masks_hdf5)
   local style_img = f_data:read('style_img'):all():float()
   if cur_resolution ~= 0 then 
-    style_img =  image.scale(style_img,  cur_resolution, cur_resolution)
-    content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
+    style_img = image.scale(style_img, cur_resolution, cur_resolution)
   end
   style_img = preprocess(style_img):float()
 
   local has_content = f_data:read('has_content'):all()[1]
-  local content_img
+  local content_img = nil
   if has_content then
     content_img = f_data:read('content_img'):all():float()
-    content_img = preprocess(content_img):float()
     if cur_resolution ~= 0 then
-        content_img =  image.scale(content_img,  cur_resolution, cur_resolution)
+        content_img =  image.scale(content_img, cur_resolution, cur_resolution)
     end
     content_img = preprocess(content_img):float()
   else

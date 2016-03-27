@@ -27,6 +27,12 @@ mask_target = scipy.misc.imread(args.target_mask)
 # Save shapes
 style_shape = mask_style.shape
 target_shape = mask_target.shape
+if img_style.shape != style_shape:
+    raise Exception('Style image and mask have different sizes!')
+if args.content_image != None:
+    if img_content.shape != target_shape:
+        raise Exception('Content image and mask have different sizes!')
+
 
 # Run K-Means to get rid of possible intermediate colors
 style_flatten = mask_style.reshape(style_shape[0]*style_shape[1], -1)
@@ -50,12 +56,14 @@ for i in range(args.n_colors):
 
 # Torch style image save
 f['style_img'] = img_style.transpose(2, 0, 1).astype(float) / 255.
+print args.content_image
 if args.content_image != None:
+    print 'Something'
     f['content_img'] = img_content.transpose(2, 0, 1).astype(float) / 255.
-    f['has_content'] = np.array([True])
+    f['has_content'] = np.array([1])
 else:
-    #f['content_img'] = np.array([0])
-    f['has_content'] = np.array([False])
+    print 'no content'
+    f['has_content'] = np.array([0])
 f['n_colors'] = np.array([args.n_colors]) # Torch does not want to read just number
 
 f.close()
