@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--n_colors', type=int, help='How many distinct colors does mask have.')
 parser.add_argument('--style_image', help='Path to style image.')
-parser.add_argument('--content_image', help='Path to content image.')
+parser.add_argument('--target_image', help='Path to target(content) image.')
 parser.add_argument('--style_mask', help='Path to mask for style.')
 parser.add_argument('--target_mask', help='Path to target mask.')
 parser.add_argument('--out_hdf5', default='masks.hdf5', help='Where to store hdf5 file.')
@@ -17,8 +17,8 @@ args = parser.parse_args()
 
 # Load images
 img_style = scipy.misc.imread(args.style_image)
-if args.content_image != None:
-    img_content = scipy.misc.imread(args.content_image)
+if args.target_image != None:
+    img_content = scipy.misc.imread(args.target_image)
 
 # Load masks
 mask_style = scipy.misc.imread(args.style_mask)
@@ -29,7 +29,7 @@ style_shape = mask_style.shape
 target_shape = mask_target.shape
 if img_style.shape != style_shape:
     raise Exception('Style image and mask have different sizes!')
-if args.content_image != None:
+if args.target_image != None:
     if img_content.shape != target_shape:
         raise Exception('Content image and mask have different sizes!')
 
@@ -56,13 +56,10 @@ for i in range(args.n_colors):
 
 # Torch style image save
 f['style_img'] = img_style.transpose(2, 0, 1).astype(float) / 255.
-print args.content_image
-if args.content_image != None:
-    print 'Something'
+if args.target_image != None:
     f['content_img'] = img_content.transpose(2, 0, 1).astype(float) / 255.
     f['has_content'] = np.array([1])
 else:
-    print 'no content'
     f['has_content'] = np.array([0])
 f['n_colors'] = np.array([args.n_colors]) # Torch does not want to read just number
 

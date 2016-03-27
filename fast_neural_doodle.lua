@@ -55,7 +55,7 @@ local function main()
   end
   style_img = preprocess(style_img):float()
 
-  local has_content = f_data:read('has_content'):all()[1]
+  local has_content = f_data:read('has_content'):all()[1] == 1
   local content_img = nil
   if has_content then
     content_img = f_data:read('content_img'):all():float()
