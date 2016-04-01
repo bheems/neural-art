@@ -33,7 +33,7 @@ And here is the result.
 First row: original, second -- result.
 
 And Monet.
-![Renoir](data/Monet/grid.png)
+![Monet](data/Monet/grid.png)
 
 ## Multiscale
 
@@ -42,6 +42,21 @@ Processing the image at low resolution first can provide a significant speed-up.
 Which means: work for 450 iterations at `256x256` resolution and 100 iterations at original. 
 
 `Monet` and `Renoir` examples take ~1.5 min to process with these options. 
+
+## Style transfer
+
+You can also provide target image to use in content loss (in the same way as in neural artisctic style algorithm) via `--target_image` option of `get\_mask\_hdf5.py` script.
+
+Example:
+```
+python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style_mask=data/Renoir/style_mask.png --target_mask=data/Renoir/creek_mask.jpg --target_image=data/Renoir/creek.jpg
+th fast_neural_doodle.lua -masks_hdf5 masks.hdf5
+```
+
+Left: no target image (neural doodle)
+Center: with target (style transfer with masks)
+Right: target image
+![Renoir](data/Renoir/creek_results.jpg)
 
 ## Misc
 - Supported backends: 

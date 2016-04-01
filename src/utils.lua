@@ -54,7 +54,7 @@ end
 -- We need to rescale from [0, 1] to [0, 255], convert from RGB to BGR,
 -- and subtract the mean pixel.
 function preprocess(img)
-  local mean_pixel = torch.DoubleTensor({103.939, 116.779, 123.68})
+  local mean_pixel = torch.FloatTensor({103.939, 116.779, 123.68})
   local perm = torch.LongTensor{3, 2, 1}
   img = img:index(1, perm):mul(256.0)
   mean_pixel = mean_pixel:view(3, 1, 1):expandAs(img)
