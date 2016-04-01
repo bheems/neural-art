@@ -54,10 +54,7 @@ th fast_neural_doodle.lua -masks_hdf5 masks.hdf5
 ```
 
 ![Renoir](data/Renoir/comparison.jpg)
-Upper left: target image
-Upper right: neural doodle with target image, i.e. both the masks and content loss were used
-Lower left: regular neural doodle without content loss
-Lower right: stylization without masks, with high style weight, obtained via [neural style code](https://github.com/jcjohnson/neural-style)
+Upper left: target image. Upper right: neural doodle with target image, i.e. both the masks and content loss were used. Lower left: regular neural doodle without content loss. Lower right: stylization without masks, with high style weight, obtained via [neural style code](https://github.com/jcjohnson/neural-style)
 
 ## Misc
 - Supported backends: 
