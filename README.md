@@ -25,7 +25,7 @@ python get_mask_hdf5.py --n_colors=4 --style_image=data/Renoir/style.png --style
 
 Now run doodle.
 ```
-th fast_neural_doodle.lua -masks_hdf5 masks.hdf5 -vgg_no_pad
+th fast_neural_doodle.lua -masks_hdf5 masks.hdf5
 ```
 
 And here is the result.
