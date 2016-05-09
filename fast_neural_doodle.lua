@@ -159,6 +159,12 @@ local function main()
 
       elseif is_conv then
 
+        local sap = nn.SpatialAveragePooling(3,3,1,1,1,1):float()
+        for k, _ in ipairs (style_masks) do
+            style_masks[k] = sap:forward(style_masks[k]:add_dummy())[1]:clone()
+            target_masks[k] = sap:forward(target_masks[k]:add_dummy())[1]:clone()
+        end
+        
         -- Turn off padding
         if params.vgg_no_pad and (layer_type == 'nn.SpatialConvolution' or layer_type == 'cudnn.SpatialConvolution') then
           layer.padW = 0
