@@ -4,6 +4,8 @@ This is my try on drawing with neural networks, which is faster than [Alex J. Ch
 
 It takes several minutes to redraw `Renoir` example using GPU and it will easily fit in 4GB GPUs. If you were able to work with [Justin Johnson's code for artistic style](https://github.com/jcjohnson/neural-style) then this code should work for you too. 
 
+You can find even faster version [here](https://github.com/DmitryUlyanov/online-neural-doodle).
+
 ## Requirements
 - torch
 - torch.cudnn (optional)
