@@ -69,3 +69,18 @@ Upper left: target image. Upper right: neural doodle with target image, i.e. bot
 ## Acknowledgement
 
 The code is heavily based on [Justin Johnson's great code](https://github.com/jcjohnson/neural-style) for artistic style.
+
+## Citation
+
+If you use this code for your research please cite [neural-style](https://github.com/jcjohnson/neural-style) and this repository.
+
+```
+@misc{Ulyanov2016fastdoodle,
+  author = {Ulyanov, Dmitry},
+  title = {Fast Neural Doodle},
+  year = {2016},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/DmitryUlyanov/fast-neural-doodle}},
+}
+```
