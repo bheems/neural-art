@@ -1,6 +1,6 @@
 ## Neural Art
 
-This is based off of Dmitry's version of drawing with neural networks. 
+This is based off of Dmitry's version of drawing with neural networks - I used pieces of it solely for local development.
 
 It takes a few minutes to redraw the `Renoir` example using GPU, and fits in 4GB GPUs well. If you were able to work with [Justin Johnson's code for artistic style](https://github.com/jcjohnson/neural-style) then this code should work for you too. 
 
