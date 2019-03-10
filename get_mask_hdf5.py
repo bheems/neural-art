@@ -1,4 +1,4 @@
-from sklearn.cluster import KMeans
+from sklearn.cluster import K_Means
 import scipy
 import numpy as np
 import h5py
@@ -38,7 +38,7 @@ if args.target_image != None:
 style_flatten = mask_style.reshape(style_shape[0]*style_shape[1], -1)
 target_flatten = mask_target.reshape(target_shape[0]*target_shape[1], -1)
 
-kmeans = KMeans(n_clusters=args.n_colors, random_state=0).fit(style_flatten)
+kmeans = K_Means(n_clusters=args.n_colors, random_state=0).fit(style_flatten)
 
 # Predict masks
 labels_style = kmeans.predict(style_flatten.astype(float))
@@ -65,4 +65,4 @@ f['n_colors'] = np.array([args.n_colors]) # Torch does not want to read just num
 
 f.close()
 
-print ('Done!')
+print ('Success!')
