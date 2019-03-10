@@ -8,7 +8,7 @@ It takes a few minutes to redraw the `Renoir` example using GPU, and fits in 4GB
 ## Dependencies
 - torch
 - [torch-hdf5](https://github.com/deepmind/torch-hdf5)
-- python + numpy + scipy + h5py + sklearn
+- python: numpy, scipy, sklearn, h5py
 
 Tested with python2.7 and latest `conda` packages.
 ## Do it yourself
