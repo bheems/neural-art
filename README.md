@@ -1,14 +1,12 @@
-## Faster neural doodle
+## Neural Art
 
-This is my try on drawing with neural networks, which is faster than [Alex J. Champandard's version](https://github.com/alexjc/neural-doodle), and similar in quality. This approach is based on [neural artistic style method](http://arxiv.org/abs/1508.06576) (L. Gatys), whereas Alex's version uses [CNN+MRF approach](http://arxiv.org/abs/1601.04589) of Chuan Li.
+This is based off of Dmitry's version of drawing with neural networks. 
 
-It takes several minutes to redraw `Renoir` example using GPU and it will easily fit in 4GB GPUs. If you were able to work with [Justin Johnson's code for artistic style](https://github.com/jcjohnson/neural-style) then this code should work for you too. 
+It takes a few minutes to redraw the `Renoir` example using GPU, and fits in 4GB GPUs well. If you were able to work with [Justin Johnson's code for artistic style](https://github.com/jcjohnson/neural-style) then this code should work for you too. 
 
-You can find even faster version [here](https://github.com/DmitryUlyanov/online-neural-doodle).
 
-## Requirements
+## Dependencies
 - torch
-- torch.cudnn (optional)
 - [torch-hdf5](https://github.com/deepmind/torch-hdf5)
 - python + numpy + scipy + h5py + sklearn
 
@@ -68,12 +66,24 @@ Upper left: target image. Upper right: neural doodle with target image, i.e. bot
 
 ## Acknowledgement
 
-The code is heavily based on [Justin Johnson's great code](https://github.com/jcjohnson/neural-style) for artistic style.
+The code is heavily based on [Justin Johnson's great code](https://github.com/jcjohnson/neural-style) for artistic style, and Dmitry's version of it.
 
 ## Citation
 
-If you use this code for your research please cite [neural-style](https://github.com/jcjohnson/neural-style) and this repository.
+1.
+```
+@misc{Johnson2015,
+  author = {Johnson, Justin},
+  title = {neural-style},
+  year = {2015},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/jcjohnson/neural-style}},
+}
 
+```
+
+2.
 ```
 @misc{Ulyanov2016fastdoodle,
   author = {Ulyanov, Dmitry},
